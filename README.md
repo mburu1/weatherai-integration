@@ -7,8 +7,8 @@ ASP.NET Core 10 proxy API that integrates the [WeatherAI `v1/weather` platform](
 | Resource | URL |
 |----------|-----|
 | **GitHub** | https://github.com/mburu1/weatherai-integration |
-| **Deployed API** | https://weatherai-api.onrender.com |
-| **Swagger UI** | https://weatherai-api.onrender.com/swagger |
+| **Deployed API** | https://weatherai-integration.onrender.com |
+| **Swagger UI** | https://weatherai-integration.onrender.com/swagger |
 | **Sample request** | `GET /api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en` |
 | **Dashboard summary** | `GET /api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric` |
 | **Compare locations** | `GET /api/compare?locations=-1.2921,36.8219\|40.7128,-74.0060&days=3&units=metric` |
@@ -174,8 +174,8 @@ Pass `locations=lat,lon|lat,lon` (pipe-separated, max 5 pairs) to fetch and comp
 3. Set **Environment** to **Docker** (uses included `Dockerfile`).
 4. Add environment variable:
    - `WeatherAI__ApiKey` = `wai_your_key_here`
-5. Deploy. Copy the service URL (e.g. `https://weatherai-api.onrender.com`).
-6. Open `https://your-url/swagger` to test live.
+5. Deploy. Copy the service URL (e.g. `https://weatherai-integration.onrender.com`).
+6. Open `https://weatherai-integration.onrender.com/swagger` to test live.
 
 Alternatively, import `render.yaml` for infrastructure-as-code deploy.
 

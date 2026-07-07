@@ -14,19 +14,19 @@ Please find my submission below:
 https://github.com/mburu1/weatherai-integration
 
 **Live deployment:**  
-https://weatherai-api.onrender.com
+https://weatherai-integration.onrender.com
 
 **Swagger UI (interactive testing):**  
-https://weatherai-api.onrender.com/swagger
+https://weatherai-integration.onrender.com/swagger
 
 **Quick test endpoint (Nairobi weather):**  
-https://weatherai-api.onrender.com/api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en
+https://weatherai-integration.onrender.com/api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en
 
 **Dashboard summary (curated view):**  
-https://weatherai-api.onrender.com/api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric
+https://weatherai-integration.onrender.com/api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric
 
 **Compare locations (Nairobi vs New York):**  
-https://weatherai-api.onrender.com/api/compare?locations=-1.2921,36.8219|40.7128,-74.0060&days=3&units=metric
+https://weatherai-integration.onrender.com/api/compare?locations=-1.2921,36.8219|40.7128,-74.0060&days=3&units=metric
 
 ### Project summary
 
