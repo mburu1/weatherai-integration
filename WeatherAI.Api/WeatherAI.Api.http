@@ -1,0 +1,25 @@
+@WeatherAI.Api_HostAddress = http://localhost:5180
+
+### Swagger UI
+# Open in browser: {{WeatherAI.Api_HostAddress}}/swagger
+
+### OpenAPI JSON
+GET {{WeatherAI.Api_HostAddress}}/swagger/v1/swagger.json
+
+### Nairobi — current + 7-day forecast with AI summary
+GET {{WeatherAI.Api_HostAddress}}/api/weather?lat=-1.2921&lon=36.8219&days=7&ai=true&units=metric&lang=en
+
+### Current conditions only (saves AI quota)
+GET {{WeatherAI.Api_HostAddress}}/api/current?lat=-1.2921&lon=36.8219&ai=false&units=metric
+
+### Hourly breakdown
+GET {{WeatherAI.Api_HostAddress}}/api/hourly?lat=-1.2921&lon=36.8219&units=metric
+
+### Daily breakdown
+GET {{WeatherAI.Api_HostAddress}}/api/daily?lat=-1.2921&lon=36.8219&days=7&units=metric
+
+### Auto-detect location from caller IP
+GET {{WeatherAI.Api_HostAddress}}/api/geo?days=1&ai=false
+
+### Account usage / quota
+GET {{WeatherAI.Api_HostAddress}}/api/usage

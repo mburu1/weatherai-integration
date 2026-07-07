@@ -1,0 +1,18 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="WeatherAI.Api/WeatherAI.Api.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="WeatherAI.Client/WeatherAI.Client.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="WeatherAI.Contracts/WeatherAI.Contracts.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="WeatherAI.Tests/WeatherAI.Tests.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+</Solution>

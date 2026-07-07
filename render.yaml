@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: weatherai-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /swagger/index.html
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: WeatherAI__ApiKey
+        sync: false
+    autoDeploy: true

@@ -1,0 +1,22 @@
+## .NET
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Secrets
+appsettings.*.local.json
+**/secrets.json
+
+## IDE
+.vs/
+.idea/
+*.swp
+
+## OS
+Thumbs.db
+.DS_Store
