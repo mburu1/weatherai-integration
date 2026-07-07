@@ -7,9 +7,11 @@ ASP.NET Core 10 proxy API that integrates the [WeatherAI `v1/weather` platform](
 | Resource | URL |
 |----------|-----|
 | **GitHub** | https://github.com/mburu1/weatherai-integration |
-| **Deployed API** | _Deploy to Render — see [Deploy to Render](#deploy-to-render-recommended)_ |
-| **Swagger UI** | `https://your-deploy-url/swagger` |
+| **Deployed API** | https://weatherai-api.onrender.com |
+| **Swagger UI** | https://weatherai-api.onrender.com/swagger |
 | **Sample request** | `GET /api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en` |
+| **Dashboard summary** | `GET /api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric` |
+| **Compare locations** | `GET /api/compare?locations=-1.2921,36.8219\|40.7128,-74.0060&days=3&units=metric` |
 
 ## Tech stack
 
@@ -17,7 +19,8 @@ ASP.NET Core 10 proxy API that integrates the [WeatherAI `v1/weather` platform](
 |-------|------------|
 | Runtime | .NET 10 |
 | API host | ASP.NET Core Minimal APIs |
-| HTTP client | `IHttpClientFactory` + typed `WeatherAiClient` |
+| HTTP client | `IHttpClientFactory` + typed `WeatherAiClient` + Polly resilience |
+| Caching | `IMemoryCache` (10-min TTL, keyed by lat/lon/days/units/ai/lang) |
 | API docs | Swashbuckle.AspNetCore 10 (Swagger UI) |
 | Testing | xUnit + RichardSzalay.MockHttp |
 | Upstream API | [WeatherAI REST API](https://api.weather-ai.co) (`v1/weather`) |
@@ -28,9 +31,13 @@ ASP.NET Core 10 proxy API that integrates the [WeatherAI `v1/weather` platform](
 ```
 WeatherAI/
 ├── WeatherAI.Contracts/   # DTOs, query options, enums
-├── WeatherAI.Client/      # Typed HTTP client + DI extensions
-├── WeatherAI.Api/         # REST proxy + Swagger UI
-└── WeatherAI.Tests/       # Unit tests (mocked HTTP)
+├── WeatherAI.Client/      # Typed HTTP client + DI + Polly retry handler
+├── WeatherAI.Api/         # REST surface, application services, Swagger UI
+│   ├── Endpoints/         # Minimal API route handlers
+│   ├── Services/          # WeatherService (cache), WeatherSummaryMapper
+│   ├── Health/            # Upstream readiness probe
+│   └── Middleware/        # Correlation ID + request timing
+└── WeatherAI.Tests/       # Unit tests (mocked HTTP + mapper)
 ```
 
 ## Prerequisites
@@ -90,7 +97,11 @@ All routes are prefixed with `/api`. The WeatherAI key is never exposed to clien
 | `GET` | `/api/hourly` | `/v1/hourly` | Hourly breakdown |
 | `GET` | `/api/daily` | `/v1/daily` | Daily breakdown |
 | `GET` | `/api/geo` | `/v1/weather-geo` | Weather via IP geo-detection |
+| `GET` | `/api/summary` | `/v1/weather` | Curated dashboard DTO (cached) |
+| `GET` | `/api/compare` | `/v1/weather` × N | Side-by-side location comparison (up to 5) |
 | `GET` | `/api/usage` | `/v1/usage` | Quota / billing usage |
+| `GET` | `/health` | — | Liveness probe |
+| `GET` | `/health/ready` | `/v1/usage` | Readiness probe (upstream connectivity) |
 
 ### Query parameters (`/api/weather`)
 
@@ -127,9 +138,18 @@ All routes are prefixed with `/api`. The WeatherAI key is never exposed to clien
   "rateLimit": {
     "limit": 1000,
     "remaining": 999
-  }
+  },
+  "servedFromCache": false
 }
 ```
+
+### Summary response (`/api/summary`)
+
+Returns a consumer-friendly view — place label, temperature string, condition text, AI brief, and daily outlook — instead of the raw upstream payload. Responses include `servedFromCache` so clients know when data was served from the in-memory cache.
+
+### Compare response (`/api/compare`)
+
+Pass `locations=lat,lon|lat,lon` (pipe-separated, max 5 pairs) to fetch and compare summaries in one call. Example: Nairobi vs New York.
 
 ## Tools & packages
 
@@ -140,6 +160,7 @@ All routes are prefixed with `/api`. The WeatherAI key is never exposed to clien
 
 **WeatherAI.Client**
 - `Microsoft.Extensions.Http` 10.0.0
+- `Microsoft.Extensions.Http.Resilience` 10.0.0 — retry on transient failures
 - `Microsoft.Extensions.Options.ConfigurationExtensions` 10.0.0
 
 **WeatherAI.Tests**
@@ -165,17 +186,43 @@ Alternatively, import `render.yaml` for infrastructure-as-code deploy.
 | `WeatherAI:ApiKey` | User secrets / env var | `wai_abc123` |
 | `WeatherAI:BaseUrl` | appsettings.json | `https://api.weather-ai.co` |
 | `WeatherAI:TimeoutSeconds` | appsettings.json | `30` |
+| `Cache:Enabled` | appsettings.json | `true` |
+| `Cache:WeatherTtlMinutes` | appsettings.json | `10` |
 | `PORT` | Cloud host (Render/Railway) | `8080` |
 
 ## Architecture
+
+This is more than a thin proxy — the API layer adds an application service that caches responses, maps raw upstream data into curated DTOs, and handles errors consistently.
 
 ```
 Client (Swagger / Browser)
         │
         ▼
-WeatherAI.Api  ──►  WeatherAI.Client  ──►  api.weather-ai.co/v1/weather
-   (Swagger UI)         (Bearer auth)            (upstream data)
+┌───────────────────────────────────────────────────────────┐
+│  WeatherAI.Api                                            │
+│  ┌─────────────┐   ┌────────────────┐   ┌──────────────┐  │
+│  │ Endpoints   │──►│ WeatherService │──►│ IMemoryCache │  │
+│  │ (Minimal)   │   │ + Mapper       │   │ (10 min TTL) │  │
+│  └─────────────┘   └───────┬────────┘   └──────────────┘  │
+│                            │                              │
+│  Middleware: correlation ID, request timing               │
+│  Health: /health (live) · /health/ready (upstream probe)  │
+└────────────────────────────┼──────────────────────────────┘
+                             ▼
+                    WeatherAI.Client
+                    (Bearer auth + Polly retry)
+                             │
+                             ▼
+                    api.weather-ai.co/v1/*
 ```
+
+**Design decisions**
+
+- **Server-side API key** — clients never see the `wai_*` token; misconfiguration returns 503, not a crash.
+- **Caching** — identical weather queries within the TTL skip upstream calls, preserving quota. `servedFromCache` is exposed in responses.
+- **Resilience** — `AddStandardResilienceHandler` retries transient HTTP failures up to 3 times before surfacing 502/504.
+- **Presentation layer** — `/api/summary` and `/api/compare` demonstrate consuming raw API data and translating it into purpose-built shapes for dashboards.
+- **Observability** — correlation IDs on every request; structured logging of duration and status.
 
 ## Author
 

@@ -59,6 +59,22 @@ public static class WeatherEndpoints
             .Produces<ApiWeatherEnvelope>(StatusCodes.Status200OK)
             .Produces<ApiErrorResponse>(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/summary", GetSummaryAsync)
+            .WithName("GetWeatherSummary")
+            .WithSummary("Curated weather summary for dashboards")
+            .WithDescription("Transforms raw WeatherAI data into a clean, consumer-friendly summary. Uses in-memory cache to reduce upstream calls.")
+            .Produces<ApiSummaryEnvelope>(StatusCodes.Status200OK)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable);
+
+        group.MapGet("/compare", CompareAsync)
+            .WithName("CompareLocations")
+            .WithSummary("Compare weather across multiple coordinates")
+            .WithDescription("Fetches and compares up to 5 locations. Format: locations=lat,lon|lat,lon (e.g. Nairobi vs New York).")
+            .Produces<ApiCompareEnvelope>(StatusCodes.Status200OK)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable);
+
         group.MapGet("/usage", GetUsageAsync)
             .WithName("GetUsage")
             .WithSummary("Billing period usage and quota")
@@ -71,7 +87,7 @@ public static class WeatherEndpoints
 
     private static async Task<IResult> GetWeatherAsync(
         [AsParameters] LocationWeatherQuery query,
-        IWeatherAiClient client,
+        IWeatherService weatherService,
         CancellationToken cancellationToken)
     {
         if (!TryCreateWeatherOptions(query, includeDays: true, defaultAi: true, out var options, out var validationError))
@@ -79,7 +95,79 @@ public static class WeatherEndpoints
             return Results.BadRequest(new ApiErrorResponse { Error = validationError!, Status = StatusCodes.Status400BadRequest });
         }
 
-        return await ExecuteWeatherAsync(query, () => client.GetWeatherAsync(options!, cancellationToken));
+        return await ExecuteAsync(async () =>
+        {
+            var result = await weatherService.GetWeatherAsync(options!, cancellationToken);
+            WeatherResponseEnricher.Enrich(result.Data, query.Lat, query.Lon);
+
+            return Results.Ok(new ApiWeatherEnvelope
+            {
+                Data = result.Data,
+                RateLimit = result.RateLimit,
+                ServedFromCache = result.ServedFromCache
+            });
+        });
+    }
+
+    private static async Task<IResult> GetSummaryAsync(
+        [AsParameters] LocationWeatherQuery query,
+        IWeatherService weatherService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryCreateWeatherOptions(query, includeDays: true, defaultAi: true, out var options, out var validationError))
+        {
+            return Results.BadRequest(new ApiErrorResponse { Error = validationError!, Status = StatusCodes.Status400BadRequest });
+        }
+
+        return await ExecuteAsync(async () =>
+        {
+            var result = await weatherService.GetSummaryAsync(options!, cancellationToken);
+            return Results.Ok(new ApiSummaryEnvelope
+            {
+                Summary = result.Data,
+                RateLimit = result.RateLimit,
+                ServedFromCache = result.ServedFromCache
+            });
+        });
+    }
+
+    private static async Task<IResult> CompareAsync(
+        [FromQuery] string locations,
+        [FromQuery] int? days,
+        [FromQuery] string? units,
+        IWeatherService weatherService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseCompareLocations(locations, out var parsed, out var validationError))
+        {
+            return Results.BadRequest(new ApiErrorResponse { Error = validationError!, Status = StatusCodes.Status400BadRequest });
+        }
+
+        if (!TryParseUnits(units, out var parsedUnits, out validationError))
+        {
+            return Results.BadRequest(new ApiErrorResponse { Error = validationError!, Status = StatusCodes.Status400BadRequest });
+        }
+
+        var template = new WeatherQueryOptions
+        {
+            Latitude = 0,
+            Longitude = 0,
+            Days = days ?? 3,
+            IncludeAiSummary = false,
+            Units = parsedUnits,
+            Language = "en"
+        };
+
+        return await ExecuteAsync(async () =>
+        {
+            var result = await weatherService.CompareAsync(parsed!, template, cancellationToken);
+            return Results.Ok(new ApiCompareEnvelope
+            {
+                Locations = result.Data,
+                RateLimit = result.RateLimit,
+                ServedFromCache = result.ServedFromCache
+            });
+        });
     }
 
     private static async Task<IResult> GetCurrentAsync(
@@ -228,6 +316,97 @@ public static class WeatherEndpoints
         parsedUnits = WeatherUnits.Metric;
         validationError = "units must be 'metric' or 'imperial'.";
         return false;
+    }
+
+    private static bool TryParseCompareLocations(
+        string? locations,
+        out IReadOnlyList<(double Lat, double Lon)>? parsed,
+        out string? validationError)
+    {
+        parsed = null;
+
+        if (string.IsNullOrWhiteSpace(locations))
+        {
+            validationError = "locations is required. Format: lat,lon|lat,lon (e.g. -1.2921,36.8219|40.7128,-74.0060).";
+            return false;
+        }
+
+        var segments = locations.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length is < 1 or > 5)
+        {
+            validationError = "locations must contain 1 to 5 coordinate pairs separated by '|'.";
+            return false;
+        }
+
+        var result = new List<(double Lat, double Lon)>(segments.Length);
+
+        foreach (var segment in segments)
+        {
+            var parts = segment.Split(',', StringSplitOptions.TrimEntries);
+
+            if (parts.Length != 2
+                || !double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var lat)
+                || !double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var lon))
+            {
+                validationError = $"Invalid coordinate pair '{segment}'. Each segment must be lat,lon.";
+                return false;
+            }
+
+            if (lat is < -90 or > 90)
+            {
+                validationError = $"Latitude {lat} in '{segment}' must be between -90 and 90.";
+                return false;
+            }
+
+            if (lon is < -180 or > 180)
+            {
+                validationError = $"Longitude {lon} in '{segment}' must be between -180 and 180.";
+                return false;
+            }
+
+            result.Add((lat, lon));
+        }
+
+        parsed = result;
+        validationError = null;
+        return true;
+    }
+
+    private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (WeatherAiConfigurationException ex)
+        {
+            return Results.Json(
+                new ApiErrorResponse { Error = ex.Message, Status = StatusCodes.Status503ServiceUnavailable },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (WeatherAiApiException ex)
+        {
+            return Results.Json(
+                new ApiErrorResponse { Error = ex.Message, Status = ex.StatusCode },
+                statusCode: ex.StatusCode);
+        }
+        catch (TaskCanceledException)
+        {
+            return Results.Json(
+                new ApiErrorResponse
+                {
+                    Error = "WeatherAI request timed out. Try again.",
+                    Status = StatusCodes.Status504GatewayTimeout
+                },
+                statusCode: StatusCodes.Status504GatewayTimeout);
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.Json(
+                new ApiErrorResponse { Error = ex.Message, Status = StatusCodes.Status502BadGateway },
+                statusCode: StatusCodes.Status502BadGateway);
+        }
     }
 
     private static async Task<IResult> ExecuteWeatherAsync(

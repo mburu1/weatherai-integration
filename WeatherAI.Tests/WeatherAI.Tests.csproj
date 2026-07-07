@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WeatherAI.Api\WeatherAI.Api.csproj" />
     <ProjectReference Include="..\WeatherAI.Client\WeatherAI.Client.csproj" />
     <ProjectReference Include="..\WeatherAI.Contracts\WeatherAI.Contracts.csproj" />
   </ItemGroup>

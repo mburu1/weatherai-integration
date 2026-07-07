@@ -11,4 +11,6 @@ public sealed class ApiWeatherEnvelope
     public WeatherResponse Data { get; init; } = new();
 
     public RateLimitInfo? RateLimit { get; init; }
+
+    public bool ServedFromCache { get; init; }
 }

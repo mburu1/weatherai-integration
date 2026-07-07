@@ -6,8 +6,20 @@
 ### OpenAPI JSON
 GET {{WeatherAI.Api_HostAddress}}/swagger/v1/swagger.json
 
+### Health — liveness
+GET {{WeatherAI.Api_HostAddress}}/health
+
+### Health — readiness (probes upstream WeatherAI)
+GET {{WeatherAI.Api_HostAddress}}/health/ready
+
 ### Nairobi — current + 7-day forecast with AI summary
 GET {{WeatherAI.Api_HostAddress}}/api/weather?lat=-1.2921&lon=36.8219&days=7&ai=true&units=metric&lang=en
+
+### Dashboard summary (curated DTO + cache)
+GET {{WeatherAI.Api_HostAddress}}/api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric
+
+### Compare Nairobi vs New York
+GET {{WeatherAI.Api_HostAddress}}/api/compare?locations=-1.2921,36.8219|40.7128,-74.0060&days=3&units=metric
 
 ### Current conditions only (saves AI quota)
 GET {{WeatherAI.Api_HostAddress}}/api/current?lat=-1.2921&lon=36.8219&ai=false&units=metric

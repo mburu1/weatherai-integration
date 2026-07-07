@@ -1,6 +1,6 @@
 # Submission email template
 
-Copy and send as a reply to the assignment email. Replace the placeholder URLs with your actual links after deploying.
+Copy and send as a reply to the assignment email.
 
 ---
 
@@ -14,24 +14,31 @@ Please find my submission below:
 https://github.com/mburu1/weatherai-integration
 
 **Live deployment:**  
-https://YOUR-SERVICE.onrender.com
+https://weatherai-api.onrender.com
 
 **Swagger UI (interactive testing):**  
-https://YOUR-SERVICE.onrender.com/swagger
+https://weatherai-api.onrender.com/swagger
 
 **Quick test endpoint (Nairobi weather):**  
-https://YOUR-SERVICE.onrender.com/api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en
+https://weatherai-api.onrender.com/api/weather?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric&lang=en
+
+**Dashboard summary (curated view):**  
+https://weatherai-api.onrender.com/api/summary?lat=-1.2921&lon=36.8219&days=5&ai=false&units=metric
+
+**Compare locations (Nairobi vs New York):**  
+https://weatherai-api.onrender.com/api/compare?locations=-1.2921,36.8219|40.7128,-74.0060&days=3&units=metric
 
 ### Project summary
 
 - **Stack:** .NET 10, ASP.NET Core Minimal APIs, Swashbuckle Swagger UI, xUnit
 - **Integration:** WeatherAI `GET /v1/weather` (and related endpoints) via a typed `HttpClient` library
 - **Design:** Multi-project solution (Contracts, Client, Api, Tests) with server-side API key handling
+- **Beyond a simple proxy:** Application service layer with in-memory caching, Polly HTTP resilience, curated summary/compare endpoints, health probes, and structured error handling
 - **Docs:** Full setup instructions in `README.md`
 
 Thank you for the opportunity. I look forward to hearing from you.
 
 Best regards,  
-[Your Name]
+Mwangi Wa Mburu
 
 ---

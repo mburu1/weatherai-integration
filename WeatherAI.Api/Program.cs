@@ -1,4 +1,6 @@
 using WeatherAI.Api.Endpoints;
+using WeatherAI.Api.Extensions;
+using WeatherAI.Api.Middleware;
 using WeatherAI.Api.Swagger;
 using WeatherAI.Client;
 using WeatherAI.Client.DependencyInjection;
@@ -13,6 +15,7 @@ if (!string.IsNullOrEmpty(port))
 
 builder.Services.AddWeatherAiSwagger();
 builder.Services.AddWeatherAiClient(builder.Configuration);
+builder.Services.AddWeatherApplication(builder.Configuration);
 
 var app = builder.Build();
 
@@ -23,13 +26,17 @@ if (string.IsNullOrWhiteSpace(apiKey))
         "WeatherAI API key is not configured. Set WeatherAI__ApiKey environment variable or user secrets.");
 }
 
+app.UseMiddleware<RequestContextMiddleware>();
 app.UseWeatherAiSwagger();
 
 app.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-    .ExcludeFromDescription();
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 app.MapWeatherEndpoints();
 
